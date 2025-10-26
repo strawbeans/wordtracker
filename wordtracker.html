@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Word Tracker</title>
+<style>
+  body { font-family: Arial; max-width: 600px; margin: auto; }
+  button { cursor:pointer; border:none; border-radius:6px; }
+</style>
+</head>
+<body>
+  <h3>📈 Word Count Progress Tracker</h3>
+
+  <label><strong>Enter words written today:</strong></label><br>
+  <input type="number" id="wordInput" min="0" style="width:100%;padding:8px;margin-top:5px;font-size:16px;" placeholder="e.g. 500">
+  <div style="margin-top:10px;">
+    <button id="addBtn" style="padding:8px 16px;background:#4CAF50;color:white;">Add Entry</button>
+    <button id="resetBtn" style="padding:8px 16px;background:#f44336;color:white;margin-left:8px;">Reset All</button>
+  </div>
+
+  <div style="margin-top:20px;font-size:18px;">
+    <strong>Total Words:</strong> <span id="totalWords">0</span><br>
+    <strong>🔥 Streak:</strong> <span id="streakCount">0</span> days
+  </div>
+
+  <div style="margin-top:15px;">
+    <label><strong>Set Goal & Deadline:</strong></label><br>
+    <input type="number" id="goalInput" min="1" style="width:45%;padding:6px;" placeholder="50000">
+    <input type="date" id="goalDate" style="width:45%;padding:6px;">
+    <button id="setGoal" style="padding:6px 12px;background:#2196F3;color:white;">Set</button>
+  </div>
+
+  <div style="margin-top:15px;background:#eee;border-radius:8px;height:24px;width:100%;overflow:hidden;">
+    <div id="progressBar" style="height:100%;width:0%;border-radius:8px;transition:width .4s,background .4s;"></div>
+  </div>
+  <p style="margin-top:6px;"><strong>Progress:</strong> <span id="progressPercent">0%</span></p>
+
+  <div id="dailyGoal" style="margin-top:10px;font-size:16px;display:none;">
+    <strong>Words Needed Today:</strong> <span id="todayNeed">0</span> <span id="daysLeft" style="color:#555;font-size:14px;"></span>
+  </div>
+
+  <p id="encourage" style="margin-top:10px;font-weight:bold;color:#4CAF50;"></p>
+
+  <div style="margin-top:15px;">
+    <strong>Log:</strong>
+    <ul id="log" style="list-style:none;padding-left:0;"></ul>
+  </div>
+
+<script>
+const store = window.localStorage;
+let total = +store.getItem('totalWords')||0;
+let log = JSON.parse(store.getItem('wordLog')||'[]');
+let goal = +store.getItem('wordGoal')||0;
+let goalDate = store.getItem('goalDate')?new Date(store.getItem('goalDate')):null;
+let streak = +store.getItem('streak')||0;
+let lastDate = store.getItem('lastDate');
+
+const q=id=>document.getElementById(id);
+function save(){store.setItem('totalWords',total);
+  store.setItem('wordLog',JSON.stringify(log));
+  store.setItem('wordGoal',goal);
+  if(goalDate)store.setItem('goalDate',goalDate.toISOString());
+  store.setItem('streak',streak);
+  store.setItem('lastDate',lastDate);}
+
+function render(){
+  q('totalWords').textContent=total.toLocaleString();
+  q('streakCount').textContent=streak;
+  q('log').innerHTML='';
+  log.forEach(addRow);
+  updateProgress();updateDaily();updateMsg();
+}
+function addRow(e){
+  const li=document.createElement('li');
+  li.style.borderBottom='1px solid #ddd';li.style.padding='6px 0';
+  const span=document.createElement('span');
+  span.textContent=`+${e.words.toLocaleString()} on ${e.date}`;
+  span.style.display='inline-block';span.style.width='60%';
+  const edit=document.createElement('button');
+  edit.textContent='✏️';edit.style.background='#2196F3';edit.style.color='white';edit.style.marginRight='4px';
+  const del=document.createElement('button');
+  del.textContent='🗑️';del.style.background='#f44336';del.style.color='white';
+  edit.onclick=()=>editEntry(e.id);
+  del.onclick=()=>{if(confirm('Delete this entry?')){total-=e.words;log=log.filter(x=>x.id!==e.id);save();render();}};
+  li.append(span,edit,del);
+  q('log').append(li);
+}
+function editEntry(id){
+  const e=log.find(x=>x.id===id);if(!e)return;
+  let val=prompt('Edit word count:',e.words);
+  if(val!==null&&!isNaN(val)&&+val>=0){total-=e.words;e.words=+val;total+=e.words;save();render();}
+}
+
+function updateProgress(){
+  if(!goal)return;
+  const p=Math.min(total/goal*100,100);
+  q('progressBar').style.width=p+'%';
+  q('progressPercent').textContent=p.toFixed(1)+'%';
+  q('progressBar').style.background=p<33?'#f44336':p<67?'#ffeb3b':'#4CAF50';
+}
+function updateDaily(){
+  if(!goal||!goalDate){q('dailyGoal').style.display='none';return;}
+  const today=new Date(),ms=864e5,days=Math.ceil((goalDate-today)/ms);
+  if(days<=0){q('todayNeed').textContent='Goal deadline reached!';q('dailyGoal').style.display='block';return;}
+  const remain=Math.max(goal-total,0);
+  q('todayNeed').textContent=Math.ceil(remain/days).toLocaleString();
+  q('daysLeft').textContent=`(${days} days left)`;
+  q('dailyGoal').style.display='block';
+}
+function updateMsg(){
+  const m=q('encourage');
+  if(streak>=7)m.textContent=`🔥 ${streak}-day streak! You're unstoppable!`;
+  else if(streak>=3)m.textContent=`💪 ${streak}-day streak—great momentum!`;
+  else if(streak>=1)m.textContent=`👏 Keep going! Every day counts.`;
+  else m.textContent='';
+}
+
+// buttons
+q('addBtn').onclick=()=>{
+  const w=+q('wordInput').value;if(!w)return;
+  const t=new Date();const str=t.toDateString();
+  if(lastDate){const diff=(t-new Date(lastDate))/864e5;
+    if(diff>=2)streak=1;else if(diff>=1)streak+=1;}
+  else streak=1;lastDate=str;
+  total+=w;log.unshift({id:Date.now(),words:w,date:t.toLocaleString()});
+  save();render();q('wordInput').value='';
+};
+q('resetBtn').onclick=()=>{if(confirm('Reset all data?')){store.clear();location.reload();}};
+q('setGoal').onclick=()=>{
+  const g=+q('goalInput').value;const d=q('goalDate').value?new Date(q('goalDate').value):null;
+  if(!g||!d){alert('Please enter both a goal and date');return;}
+  goal=g;goalDate=d;save();render();
+  alert(`Goal set: ${goal.toLocaleString()} by ${goalDate.toDateString()}`);
+};
+render();
+</script>
+</body>
+</html>
